@@ -1,0 +1,6 @@
+{
+    "baud": 115200,
+    "port": "",
+    "terminator": "CR_LF",
+    "geometry": "696x619+3040+265"
+}

@@ -13,6 +13,7 @@ from serial.tools import list_ports
 
 APP_NAME = 'serialsimple'
 APP_VERSION = '0.0.1'
+APP_AUTHOR = 'Victor Krook'
 
 TERMINATORS = {
     'LF': b'\n',
@@ -52,6 +53,9 @@ class App(tk.Tk):
     def __init__(self):
         super().__init__()
         self._setup()
+        
+        self.style = ttk.Style()
+        self.style.theme_use('clam')
 
         self._serial: Serial = None
 
@@ -94,28 +98,36 @@ class App(tk.Tk):
         self.entry_baud.grid(row=1, column=1, **pad, sticky=tk.W)
         self.combo_terminators.grid(row=2, column=1, **pad, sticky=tk.W)
         # Buttons
-        self.button_connect.grid(row=3, column=0, **pad)
-        self.button_disconnect.grid(row=3, column=1, **pad)
+        self.button_connect.grid(row=0, column=2, **pad)
+        self.button_disconnect.grid(row=1, column=2, **pad)
+
+        self.msgs = []
+        self.msgs_i = 0
 
         # -- Main frame -- #
         self.frame_main = tk.Frame(self)
         self.output = tk.Text(self.frame_main)
 
         self.frame_send = tk.Frame(self.frame_main)
+        
         self.entry_send = tk.Entry(self.frame_send, textvariable=self._tx_var)
         self.entry_send.bind('<Return>', lambda *_: self._send())
+        self.entry_send.bind('<KeyPress-Down>', lambda *_: self._down())
+        self.entry_send.bind('<KeyPress-Up>', lambda *_: self._up())
+        self.c = ttk.Combobox(self.frame_send)
         self.button_send = tk.Button(self.frame_send, text='Send',
                                      command=self._send)
-        self.entry_send.pack(side=tk.LEFT, **pad)
+        self.entry_send.pack(side=tk.LEFT, expand=True, fill=tk.X, **pad)
         self.button_send.pack(side=tk.LEFT, **pad)
-
+        self.c.pack(expand=True, fill=tk.X)
+        
         self.ports: List[str] = []
 
         self.output.pack(expand=True, fill=tk.BOTH)
-        self.frame_send.pack()
+        self.frame_send.pack(fill=tk.BOTH)
 
         pad = {'padx': 10, 'pady': 20}
-        self.frame_control.pack(**pad)
+        self.frame_control.pack(**pad, anchor=tk.W)
         self.frame_main.pack(expand=True, fill=tk.BOTH, **pad)
 
         Thread(target=self._port_watcher, daemon=True).start()
@@ -137,9 +149,25 @@ class App(tk.Tk):
         self._disconnect()
         self.destroy()
 
+    def _set_msg_index(self, index: int) -> None:
+        self.msgs_i = index
+        if self.msgs_i >= len(self.msgs):
+            self.msgs_i = len(self.msgs) - 1
+        if self.msgs_i < 0:
+            self.msgs_i = 0
+        self._update()
+
+    def _up(self) -> None:
+        self._set_msg_index(self.msgs_i + 1)
+
+    def _down(self) -> None:
+        self._set_msg_index(self.msgs_i - 1)
+
     def _send(self) -> None:
         tx = self._tx_var.get()
-        if tx:
+        self.msgs.append(tx)
+        self._update()
+        if tx and self._serial is not None:
             self._tx.put(tx)
             self._tx_var.set('')
 
@@ -171,6 +199,9 @@ class App(tk.Tk):
         pass
 
     def _update(self) -> None:
+        self.c['values'] = list(reversed(self.msgs))
+        if self.msgs:
+            self.c.current(self.msgs_i)
         self.combo_ports['values'] = self.ports
 
         if self.ports and not self._port.get():
